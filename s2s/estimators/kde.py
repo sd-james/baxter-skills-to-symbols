@@ -36,7 +36,15 @@ class KernelDensityEstimator(StateDensityEstimator):
             data = X[:, self.mask]
         bandwidth_range = kwargs.get('effect_bandwidth_range', np.arange(0.001, 0.1, 0.001))
         params = {'bandwidth': bandwidth_range}
-        grid = GridSearchCV(KernelDensity(kernel='gaussian'), params, cv=3)
+
+        if len(data) == 1:
+            data = np.vstack((data, data))
+
+        k = min(3, len(data))
+
+
+
+        grid = GridSearchCV(KernelDensity(kernel='gaussian'), params, cv=k)
         grid.fit(data)
         show("Best bandwidth hyperparameter: {}".format(grid.best_params_['bandwidth']), verbose)
         self._kde = grid.best_estimator_

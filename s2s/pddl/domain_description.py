@@ -1,7 +1,7 @@
 from typing import Iterable, List
 
 from s2s.env.s2s_env import S2SEnv
-from s2s.pddl.operator import Operator, PrettyPrint
+from s2s.pddl.operator import Operator, PrettyPrint, SimplePrettyPrint
 from s2s.pddl.proposition import Proposition
 from s2s.pddl.unique_list import UniquePredicateList
 from s2s.utils import indent
@@ -47,5 +47,20 @@ class PDDLDomain:
             indent(requirements),
             indent(predicates),
             indent(operators)
+        )
+        return description
+
+
+    def to_simple(self):
+        predicates = ' '.join(['({})'.format(Proposition.not_failed())] + ['({})'.format(x) for x in self._vocabulary])
+
+        operators = '\n'.join(
+            [str(SimplePrettyPrint(x, i, self._probabilistic, self._rewards, self._env.describe_option)) for i, x in
+             enumerate(self._operators)])
+
+        description = 'predicates:{}\nn_operators:{}\n\n{}'.format(
+            predicates,
+            len(self._operators),
+            operators
         )
         return description

@@ -65,14 +65,19 @@ class S2SEnv(gym.Env, ABC):
         Return an image for the given states. This method can be overriden to optimise for the fact that there are
          multiple states. If not, it will simply average the results of render_state for each state
         """
-        return Image.merge([self.render_state(state) for state in states])
+        return Image.merge([self.render_state(state, **kwargs) for state in states])
 
     def render_state(self, state: np.ndarray, **kwargs) -> np.ndarray:
         """
         Return an image of the given state. Where state variables are missing, specify with np.nan
         """
-        nan_mask = np.where(np.isnan(state))
-        state[nan_mask] = self.observation_space.sample()[nan_mask]
+        if kwargs.get('masked'):
+            s = self.observation_space.sample()
+            s[kwargs.get('mask')] = state
+            state = s
+        else:
+            nan_mask = np.where(np.isnan(state))
+            state[nan_mask] = self.observation_space.sample()[nan_mask]
         return self._render_state(state, **kwargs)
 
     def _render_state(self, state: np.ndarray, **kwargs) -> np.ndarray:

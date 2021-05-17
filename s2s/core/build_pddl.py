@@ -31,13 +31,16 @@ def _overlapping_dists(x: KernelDensityEstimator, y: KernelDensityEstimator) -> 
     if set(x.mask) != set(y.mask):
         return False
 
+    # return False
+
     dat1 = x.sample(100)
     dat2 = y.sample(100)
 
-    mean1 = np.mean(dat1)
-    mean2 = np.mean(dat2)
+    mean1 = np.mean(dat1, axis=0)
+    mean2 = np.mean(dat2, axis=0)
     if np.linalg.norm(mean1 - mean2) > 0.1:
         return False
+    return True
 
     ndims = len(x.mask)
     for n in range(ndims):
@@ -137,6 +140,9 @@ def _generate_symbols(states: np.ndarray, total_factors: List[List[int]], verbos
     symbols = list()
     show("Fitting estimator to states", verbose)
 
+    if len(states) == 1:
+        states = np.vstack((states, states))
+
     full_mask = range_without(0, states.shape[1])  # all the state variables
     distribution = KernelDensityEstimator(full_mask)
     distribution.fit(states, verbose=verbose, **kwargs)
@@ -145,7 +151,10 @@ def _generate_symbols(states: np.ndarray, total_factors: List[List[int]], verbos
     factors = _extract_factors(distribution.mask, total_factors)
     # we have a distribution over multiple factors. So extract each factor individually
     for subset in itertools.combinations(factors, len(factors) - 1):
-        new_dist = distribution.integrate_out(np.concatenate(subset))
+        if len(subset) == 0:
+            new_dist = distribution
+        else:
+            new_dist = distribution.integrate_out(np.concatenate(subset))
         symbols.append(new_dist)
 
     return symbols
@@ -301,8 +310,8 @@ def _build_pddl_operator(env: gym.Env, precondition_factors: List[List[int]], op
     for factor in precondition_factors:
         candidates.append([proposition for proposition in vocabulary if set(proposition.mask) == set(factor)])
 
-    high_threshold = kwargs.get('high_threshold', 0.95)
-    low_threshold = kwargs.get('low_threshold', 0.1)
+    high_threshold = kwargs.get('high_threshold', 0.55)
+    low_threshold = kwargs.get('low_threshold', 0.3)
 
     # when intersecting propositions with preconditions allow for the effects to be a subspace of the precondition
     # (and have the missing variables randomly sampled)
@@ -331,7 +340,6 @@ def _build_pddl_operator(env: gym.Env, precondition_factors: List[List[int]], op
             precondition_prob = round(precondition_prob, 3)  # make look nice
             pddl_operator = Operator(operator)
             pddl_operator.add_preconditions(candidates)
-
             remaining_probability = 1
             if precondition_prob < high_threshold:
                 remaining_probability = precondition_prob

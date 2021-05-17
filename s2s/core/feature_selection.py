@@ -6,8 +6,55 @@ from sklearn.model_selection import GridSearchCV, cross_val_score
 from sklearn.svm import SVC
 
 from s2s.utils import show, range_without
+from itertools import chain, combinations
 
 __author__ = 'Steve James and George Konidaris'
+
+
+def _compute_precondition_mask_powerset(positive_samples: np.ndarray, negative_samples: np.ndarray, labels: List[int],
+                                        verbose=False, **kwargs):
+    """
+    Compute the precondition mask using a feature selection procedure. These are the variables that matter when
+    determining whether an option can be executed
+    :param positive_samples: an array of positive states
+    :param negative_samples: an array of negative states
+    :param labels: labels corresponding to positive and negative states
+    :param verbose: the verbosity level
+    :return: the mask
+    """
+
+
+
+    def powerset(iterable):
+        "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+        s = list(iterable)
+        return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
+
+    samples = np.vstack((positive_samples, negative_samples))
+
+    # compute the precondition mask through feature selection
+    mask = []
+    n_vars = samples.shape[1]
+
+    # compute the score with ALL state variables
+    total_score, params = _get_orig_score_params(samples, labels, **kwargs)
+    show("Score with all variables: {}".format(total_score), verbose)
+
+    score = 0
+    for subset in powerset(list(range(n_vars))):
+        if len(subset) == 0 or len(subset) == n_vars:
+            continue
+
+        subset = list(subset)
+        subset_score = _get_subset_score(samples, labels, subset, params)
+        if subset_score > score:
+            score = subset_score
+            mask = subset
+            if score == 1:
+                break  # cannot improve
+    mask.sort()  # ensure mask is always sorted to avoid bugs down the line
+    show("Final precondition mask: {} with score {}".format(mask, score), verbose)
+    return mask
 
 
 def _compute_precondition_mask(positive_samples: np.ndarray, negative_samples: np.ndarray, labels: List[int],
@@ -21,6 +68,11 @@ def _compute_precondition_mask(positive_samples: np.ndarray, negative_samples: n
     :param verbose: the verbosity level
     :return: the mask
     """
+
+    if kwargs.get('brute_force_features', False):
+        return _compute_precondition_mask_powerset(positive_samples, negative_samples, labels, verbose=verbose,
+                                                   **kwargs)
+
     samples = np.vstack((positive_samples, negative_samples))
 
     # compute the precondition mask through feature selection
@@ -32,7 +84,6 @@ def _compute_precondition_mask(positive_samples: np.ndarray, negative_samples: n
     show("Score with all variables: {}".format(total_score), verbose)
 
     threshold = kwargs.get('mask_removal_threshold', 0.02)
-
 
     # try remove each state variable in turn, see what the score is
     for m in range(n_vars):

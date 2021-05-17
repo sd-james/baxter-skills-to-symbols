@@ -13,7 +13,7 @@ from s2s.env.s2s_env import S2SEnv, S2SWrapper
 from s2s.pddl.domain_description import PDDLDomain
 from s2s.pddl.problem_description import PDDLProblem
 from s2s.pddl.proposition import Proposition
-from s2s.render import visualise_partitions, visualise_symbols
+from s2s.render import visualise_partitions, visualise_symbols, visualise_preconditions, visualise_effects
 from s2s.utils import save, make_dir, show, load
 
 __author__ = 'Steve James and George Konidaris'
@@ -50,11 +50,12 @@ def build_model(env: S2SEnv,
     millis = int(round(time.time() * 1000))
 
     # 1. Collect data
-    transition_data, initiation_data = collect_data(S2SWrapper(env, options_per_episode),
-                                                    max_episode=n_episodes,
-                                                    verbose=verbose,
-                                                    n_jobs=n_jobs,
-                                                    **kwargs)
+    transition_data, initiation_data = env.get_transition_data(), env.get_init_data()
+    # transition_data, initiation_data = collect_data(S2SWrapper(env, options_per_episode),
+    #                                                 max_episode=n_episodes,
+    #                                                 verbose=verbose,
+    #                                                 n_jobs=n_jobs,
+    #                                                 **kwargs)
 
     # 2. Partition options
     partitions = partition_options(env,
@@ -86,10 +87,10 @@ def build_model(env: S2SEnv,
     for prop in vocabulary.start_predicates:
         pddl_problem.add_start_proposition(prop)
 
-    goal_prob, goal_symbols = find_goal_symbols(factors, vocabulary, transition_data, verbose=verbose, **kwargs)
+    # goal_prob, goal_symbols = find_goal_symbols(factors, vocabulary, transition_data, verbose=verbose, **kwargs)
     pddl_problem.add_goal_proposition(Proposition.not_failed())
-    for prop in vocabulary.goal_predicates + goal_symbols:
-        pddl_problem.add_goal_proposition(prop)
+    # for prop in vocabulary.goal_predicates + goal_symbols:
+    #     pddl_problem.add_goal_proposition(prop)
 
     show('\n\nBuilding PDDL took {} ms'.format(int(round(time.time() * 1000)) - millis), verbose)
 
@@ -108,6 +109,7 @@ def build_model(env: S2SEnv,
         save(pddl, '{}/domain.pkl'.format(save_dir))
         save(pddl_problem, '{}/problem.pkl'.format(save_dir))
         save(pddl, '{}/domain.pddl'.format(save_dir), binary=False)
+        save(pddl.to_simple(), '{}/domain.txt'.format(save_dir), binary=False)
         save(pddl_problem, '{}/problem.pddl'.format(save_dir), binary=False)
 
         if visualise:
@@ -117,5 +119,10 @@ def build_model(env: S2SEnv,
                                  option_descriptor=lambda option: env.describe_option(option))
             visualise_symbols('{}/vis_symbols'.format(save_dir), env, vocabulary, verbose=True,
                               render=env.render_states)
+            visualise_preconditions('{}/vis_preconditions'.format(save_dir), env, preconditions, initiation_data,
+                                    verbose=verbose, option_descriptor=lambda option: env.describe_option(option))
+
+            visualise_effects('{}/vis_effects'.format(save_dir), env, effects, verbose=verbose,
+                              option_descriptor=env.describe_option)
 
     return pddl, pddl_problem

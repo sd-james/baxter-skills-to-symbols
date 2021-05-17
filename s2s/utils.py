@@ -35,12 +35,16 @@ def select_rows(data: pd.DataFrame, indices: Iterable, reset_index=True) -> pd.D
     return frame
 
 
-def run_parallel(functions: List[Callable]):
+def run_parallel(functions: List[Callable], serial=False):
     """
     Run the list of function in parallel and return the results in a list
     :param functions: the functions to execute
     :return: a list of results
     """
+
+    if serial:
+        return [f() for f in functions]
+
     n_procs = len(functions)
     pool = multiprocessing.Pool(processes=n_procs)
     processes = [pool.apply_async(functions[i]) for i in range(n_procs)]

@@ -109,6 +109,54 @@ class PrettyPrint:
             return '{}'.format(propositions[0])
         return 'and {}'.format(' '.join(['({})'.format(x) for x in propositions]))
 
+
+class SimplePrettyPrint(PrettyPrint):
+
+    def _propositions_to_str(self, propositions: List[Proposition], end=None) -> str:
+        if len(propositions) == 0:
+            return ''
+
+        propositions = list(map(str, propositions))
+        if end is not None:
+            propositions.append(end)
+
+        if len(propositions) == 1:
+            return '({})'.format(propositions[0])
+        return ' '.join(['({})'.format(x) for x in propositions])
+
+    def __str__(self):
+        precondition = self._propositions_to_str(self._operator.preconditions)
+
+        if self._probabilistic:
+            effects = self._operator.effects
+        else:
+            effects = [max(self._operator.effects, key=lambda x: x[0])]  # get most probable
+
+        effect = 'probabilistic '
+        effect=''
+
+        total_prob = sum(prob for prob, _, _ in effects)  # sometimes total prob is just over 1 because rounding :(
+
+        for prob, eff, reward in effects:
+            prob = round(prob / total_prob, 3)  # TODO probably a better way!
+            end = None
+            if self._use_rewards and reward is not None:
+                end = '{} (reward) {:.2f}'.format('increase' if reward >= 0 else 'decrease', abs(reward))
+            effect += '\n{}:{};{}'.format(prob, self._propositions_to_str([x for x in eff if x.sign > 0], end),
+                                          self._propositions_to_str([x.negate() for x in eff if x.sign < 0], end))
+        effect += '\n'
+
+        if self._option_descriptor is None:
+            name = self._operator.name
+        else:
+            name = '{}-partition-{}'.format(self._option_descriptor(self._operator.option), self._operator.partition)
+        if self._index is not None:
+            name += '-{}'.format(self._index)
+
+        return '{}\n{}{}'.format(name,
+                                                                 precondition,
+                                                                 effect)
+
     # # todo: LOOK AT
     # def is_duplicate(self, other):
     #     ps = sorted([p.name for p in self.preconditions])

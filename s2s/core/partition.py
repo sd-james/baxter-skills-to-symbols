@@ -1,3 +1,4 @@
+import warnings
 from collections import defaultdict, ChainMap
 from functools import partial
 from typing import List, Dict, Tuple, Iterable
@@ -86,13 +87,29 @@ def _partition_option(option: int, data: pd.DataFrame, verbose=False, **kwargs) 
     :param verbose: the verbosity level
     :return: a list of partitioned options
     """
-
     data = data.reset_index(drop=True)  # reset the indices since the data is a subset of the full transition data
-    partition_effects = list()
-    # extract the masks
+
+    ####################################################### NEW ########################################################
     masks = data['mask'].apply(tuple).unique()
+    to_drop = list()
     for mask in masks:
-        samples = data.loc[_select_where(data['mask'], mask)].reset_index(drop=True)  # get samples with that mask
+        indices = _select_where(data['mask'], mask)
+        if len(indices) < 3:
+            to_drop.extend(indices)
+    if len(to_drop) > 0:
+        data = data.drop([data.index[i] for i in to_drop])
+    data = data.reset_index(drop=True)  # reset the indices since the data is a subset of the full transition data
+    ####################################################### NEW ########################################################
+
+    partition_effects = list()
+    masks = data['mask'].apply(tuple).unique()
+
+    total_mask = {y for x in masks for y in x}
+    masks = [list(sorted(total_mask))]
+    for mask in masks:
+        samples = data.assign(mask=[mask] * len(data))  # NEW
+        # samples = data.reset_index(drop=True)
+        # samples = data.loc[_select_where(data['mask'], mask)].reset_index(drop=True)  # get samples with that mask
         clusters = _cluster_effects(samples, mask, verbose=verbose, **kwargs)  # cluster based on effects
 
         # TODO: this code could be improved/optimised, but will do that another time
@@ -219,6 +236,17 @@ def _cluster_effects(samples: pd.DataFrame, mask: List[int], verbose=False, **kw
     """
     epsilon = kwargs.get('effect_epsilon', 0.05)
     min_samples = kwargs.get('effect_min_samples', 5)
+
+    if min_samples == np.inf:
+
+        if len(samples) < 3:
+            return []
+
+        clusters = [samples]
+        # reset the index back to zero based
+        clusters = [cluster.reset_index(drop=True) for cluster in clusters]  # not in place
+        return clusters
+
     data = pd2np(samples['next_state'])  # convert to numpy
     masked_data = data[:, mask]  # cluster only on state variables that changed
 
@@ -226,6 +254,12 @@ def _cluster_effects(samples: pd.DataFrame, mask: List[int], verbose=False, **kw
     labels = db.labels_
     show("Found {}/{} noisy samples".format((labels == -1).sum(), len(labels)), verbose)
     clusters = list()
+
+    if all(elem == -1 for elem in labels):
+        warnings.warn("All datapoints classified as noise!")
+        labels = np.zeros(shape=(len(labels)))
+
+
     for label in set(labels):
         if label == -1:
             # noise

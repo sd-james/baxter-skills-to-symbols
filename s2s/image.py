@@ -70,7 +70,7 @@ class Image:
     @staticmethod
     def show(image, mode='L'):
         img = I.fromarray(np.uint8(image), mode=mode)
-        img.show()
+        img.show_syms()
 
     @staticmethod
     def save(image, filename, mode='L'):
