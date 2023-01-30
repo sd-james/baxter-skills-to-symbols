@@ -4,7 +4,7 @@ from typing import List
 import cv2
 import numpy as np
 
-from s2s.baxter_env import BaxterEnv, BaxterEnvVec, BaxterEnvVAE, BaxterEnvSmall
+from s2s.aosm_env import AosmEnv, AosmEnvVec, AosmEnvVAE, AosmEnvSmall
 from s2s.core.build_model import build_model
 from s2s.image import Image
 from s2s.pddl.domain_description import PDDLDomain
@@ -64,7 +64,7 @@ def find(v, y):
 def join(estimators):
     mask = list()
     for predicate in estimators:
-        mask.extend(predicate.mask)
+        mask.extend(predicate.type_mask)
 
     samples = np.hstack([predicate.sample(10) for predicate in estimators])
     return samples, mask
@@ -85,7 +85,7 @@ def write_clashes(save_dir):
     vocabulary = load('{}/predicates.pkl'.format(save_dir))
     clash = defaultdict(list)
     for v in vocabulary:
-        mask = tuple(v.mask)
+        mask = tuple(v.type_mask)
         clash[mask].append(v)
     with open(make_path(save_dir, 'clashes.txt'), 'w') as file:
         for _, syms in clash.items():
@@ -96,7 +96,7 @@ if __name__ == '__main__':
 
     save_dir = '../data/output/baxter_data_small'
 
-    env = BaxterEnvSmall()
+    env = AosmEnvSmall()
     env.load("../data/input/baxter_images_webcam_plates/action_webcam.txt",
              "../data/input/baxter_images_webcam_plates/valid_actions_webcam.txt",
              "../data/input/baxter_images_webcam_plates/images_pre_webcam_rgb.npy",

@@ -4,7 +4,7 @@ from typing import List
 import cv2
 import numpy as np
 
-from s2s.baxter_env import BaxterEnv, BaxterEnvVec
+from s2s.aosm_env import AosmEnv, AosmEnvVec
 from s2s.core.build_model import build_model
 from s2s.image import Image
 from s2s.pddl.domain_description import PDDLDomain
@@ -52,7 +52,7 @@ def find(v, y):
 def join(estimators):
     mask = list()
     for predicate in estimators:
-        mask.extend(predicate.mask)
+        mask.extend(predicate.type_mask)
 
     samples = np.hstack([predicate.sample(100) for predicate in estimators])
     return samples, mask
@@ -161,7 +161,7 @@ if __name__ == '__main__':
         type = '{}_small'.format(type)
     save_dir = '../data/output/baxter_data_{}'.format(type.lower(), small)
 
-    env = BaxterEnv(type, n_components, blue=False, small=small)
+    env = AosmEnv(type, n_components, blue=False, small=small)
     env.load("../data/input/baxter_images_webcam_plates/action_webcam.txt",
              "../data/input/baxter_images_webcam_plates/valid_actions_webcam.txt",
              "../data/input/baxter_images_webcam_plates/images_pre_webcam_rgb.npy",

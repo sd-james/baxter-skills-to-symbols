@@ -1,22 +1,23 @@
+import itertools
 from collections import ChainMap
 from functools import partial
 from typing import List, Dict, Tuple, Any
-from warnings import warn
 
 import gym
 import numpy as np
 import pandas as pd
 
-from s2s.core.feature_selection import _compute_precondition_mask
+from s2s.core.feature_selection import _compute_object_precondition_mask
 from s2s.estimators.estimators import RewardRegressor, StateDensityEstimator, PreconditionClassifier
 from s2s.estimators.kde import KernelDensityEstimator
 from s2s.estimators.simple_regressor import SimpleRegressor
 from s2s.estimators.svc import SupportVectorClassifier
 from s2s.core.learned_operator import LearnedOperator
 from s2s.core.partitioned_option import PartitionedOption
-from s2s.utils import show, pd2np, run_parallel
 
 __author__ = 'Steve James and George Konidaris'
+
+from s2s.utils import show, run_parallel, pd2np, flatten
 
 
 def combine_learned_operators(env: gym.Env, partitioned_options: Dict[int, List[PartitionedOption]],
@@ -71,32 +72,28 @@ def _learn_effects(partitioned_options: List[PartitionedOption], verbose=False, 
 
         probabilistic_outcomes = list()  # a list of tuples (prob, effect estimator, reward estimator)
 
-        for j, (prob, states, rewards, next_states, masks) in enumerate(partition.effects()):
+        for j, (prob, states, next_states) in enumerate(partition.masked_effects()):
             show("Processing probabilistic effect {}".format(j), verbose)
 
-            # make sure no issues with masks. They should all be the same,  else there's a problem with partitioning
-            if not (masks == masks[0]).all():
-                raise ValueError("Masks in effect for option {}, partition {} are different!"
-                                 .format(option, partition.partition))
-            mask = sorted(masks[0])  # sorting to prevent any bugs ever!
+            # # make sure no issues with masks. They should all be the same,  else there's a problem with partitioning
+            # if not (masks == masks[0]).all():
+            #     raise ValueError("Masks in effect for option {}, partition {} are different!"
+            #                      .format(option, partition.partition))
 
             show("Fitting effect estimator", verbose)
-            effect = KernelDensityEstimator(mask)
-            effect.fit(next_states, verbose=verbose, **kwargs)  # compute the effect
 
-            if kwargs.get('specify_rewards', True):
-                show("Fitting reward estimator", verbose)
-                reward_estimator = SimpleRegressor()
-                reward_estimator.fit(states, rewards, verbose=verbose, **kwargs)  # estimate the reward
-            else:
-                reward_estimator = None
-            probabilistic_outcomes.append((prob, effect, reward_estimator))
+            object_types = _extract_types(next_states)
+
+            effect = KernelDensityEstimator(object_types)  # no need for mask - is pointless
+            effect.fit(next_states, verbose=verbose, masked=True, **kwargs)  # compute the effect
+
+            probabilistic_outcomes.append((prob, effect, None))
         effects[(option, partition.partition)] = probabilistic_outcomes
 
     return effects
 
 
-def learn_preconditions(env: gym.Env, init_data: pd.DataFrame, partitioned_options: Dict[int, List[PartitionedOption]],
+def learn_preconditions(init_data: pd.DataFrame, partitioned_options: Dict[int, List[PartitionedOption]],
                         verbose=False, **kwargs) -> Dict[Tuple[int, int], PreconditionClassifier]:
     """
     Learn all the preconditions for the partitioned options
@@ -116,36 +113,77 @@ def learn_preconditions(env: gym.Env, init_data: pd.DataFrame, partitioned_optio
     return dict(ChainMap(*preconditions))  # reduce to single dict
 
 
+def _extract_types(data):
+    ret = None
+    for row in data:
+        types = list()
+        for object in row:
+            types.append(object[-1])
+        if ret is None:
+            ret = types
+        elif ret != types:
+            raise ValueError
+    return sorted(ret)
+
+
+def find_type(objects, type):
+    return [object for object in objects if object[-1] == type]
+
+def mask_on_object_type(negatives, positives):
+
+    masked = list()
+    types = _extract_types(positives)
+    for row in negatives:
+        candidates = [find_type(row, type) for type in types]
+        for x in itertools.product(*candidates):
+            masked.append(np.array(x))
+    return np.array(masked), types
+
+
 def _learn_preconditions(init_data: pd.DataFrame, partitioned_options: List[PartitionedOption],
                          all_partitions: Dict[int, List[PartitionedOption]],
                          verbose=False, **kwargs) -> Dict[Tuple[int, int], PreconditionClassifier]:
+    state_column = 'state'
     preconditions = dict()
     prev_option = None
     negative_data = None
     for partition in partitioned_options:
         option = partition.option
-        if option != prev_option:
-            # no need to reload if no change
-            negative_data = pd2np(init_data.loc[(init_data['option'] == option) &
-                                                (init_data['can_execute'] == False)]['state'])
+
+        # this property gets either agent or problem-space states, whichever was used to partition in the first place
+        # now we need to work out the masked data!
+        positive_samples = partition.masked_states()
+
+        negative_data = pd2np(init_data.loc[(init_data['option'] == option) &
+                                            # (init_data['object'] == partition.object) &
+                                            (init_data['can_execute'] == False)
+                                            ][state_column], make_rectangle=True)
         # must do equals False because Pandas!
 
+        # compute only the masked negative stuff
+        negative_data, type_mask = mask_on_object_type(negative_data, positive_samples)
+
+
         show('Learning precondition for option {}, partition {}'.format(option, partition.partition), verbose)
-        if kwargs.get('augment_negative', True):
+        if kwargs.get('augment_negative', False):
             # augment negative samples from the initiation sets of the other partitions
-            negative_samples = _augment_negative(negative_data, partition.partition, all_partitions[option])
+            additional = _augment_negative(partition.partition, all_partitions[option])
+            additional, _ = mask_on_object_type(additional, positive_samples)
+            negative_samples = np.vstack((negative_data, additional))
         else:
             negative_samples = negative_data
-        positive_samples = partition.states
+
+
+
         show("Calculating mask for option {}, partition {} ...".format(partition.option, partition.partition), verbose)
-        precondition = _learn_precondition(positive_samples, negative_samples,
+        precondition = _learn_precondition(partition, positive_samples, negative_samples, type_mask=type_mask,
                                            verbose=verbose, **kwargs)
         preconditions[(option, partition.partition)] = precondition
         prev_option = option
     return preconditions
 
 
-def _augment_negative(negative_data: np.ndarray, current_partition: int,
+def _augment_negative(current_partition: int,
                       partitions: List[PartitionedOption]) -> np.ndarray:
     """
     Add data from other partitions as negative sample instances
@@ -154,21 +192,23 @@ def _augment_negative(negative_data: np.ndarray, current_partition: int,
     :param partitions: all the partitioned options for the current option
     :return: the augmented set of negative data
     """
-    if len(negative_data) == 0:
-        negatives = list()
-    else:
-        negatives = [negative_data]
+
+    negatives = list()
+
     for partition in partitions:
-        if partition.partition == current_partition:
-            continue  # ignore the current one
+        if partitions[current_partition].is_similar(partition.partition):
+            continue  # ignore those partitions that look similar in agent space, since this will break the precondition
+        # this property gets either agent or problem-space states, whichever was used to partition in the first place
         negatives.append(partition.states)  # add the others as negatives
     return np.vstack(negatives)
 
 
-def _learn_precondition(positive_samples: np.ndarray, negative_samples: np.ndarray, verbose=False,
+def _learn_precondition(partition: PartitionedOption, positive_samples: np.ndarray, negative_samples: np.ndarray,
+                        verbose=False, type_mask=None,
                         **kwargs) -> PreconditionClassifier:
     """
     Learn a single classifier for a partitioned option
+    :param partition: the option partition
     :param positive_samples: the positive samples
     :param negative_samples: the negative samples
     :param verbose: the verbosity level
@@ -182,11 +222,28 @@ def _learn_precondition(positive_samples: np.ndarray, negative_samples: np.ndarr
     max_precondition_samples = kwargs.get('max_precondition_samples', np.inf)
     # resample if too much data
     positive_samples, negative_samples = _resample(positive_samples, negative_samples, max_precondition_samples)
-    labels = [1] * len(positive_samples) + [0] * len(negative_samples)
+    labels = np.array([1] * len(positive_samples) + [0] * len(negative_samples))
 
-    precondition_mask = _compute_precondition_mask(positive_samples, negative_samples, labels, verbose=verbose,
-                                                   **kwargs)
-    svm = SupportVectorClassifier(precondition_mask)
+    type_mask, index_mask = _compute_object_precondition_mask(positive_samples, negative_samples, labels, partition.objects,
+                                                          type_mask, verbose=verbose, **kwargs)
+    svm = SupportVectorClassifier(type_mask, index_mask)
+
+    # if kwargs.get('generate_positive_samples', False):
+    #     # generate extra positive samples from a density estimator!
+    #     pos_sym = KernelDensityEstimator(precondition_mask)
+    #     pos_sym.fit(positive_samples, verbose=verbose, **kwargs)  # compute the effect
+    #
+    #     pos = flatten(pos_sym.sample(len(negative_samples)))
+    #     neg = flatten(negative_samples, mask=precondition_mask)
+    #     examples = np.vstack((pos, neg))
+    #     labels = np.array([1] * len(pos) + [0] * len(neg))
+    #     svm.fit(examples, labels, verbose=verbose, use_mask=False, **kwargs)
+    # else:
+
+    # positive_samples = flatten(positive_samples, mask=precondition_mask)
+    # negative_samples = flatten(negative_samples, mask=precondition_mask)
+
+
     data = np.vstack((positive_samples, negative_samples))
     svm.fit(data, labels, verbose=verbose, **kwargs)
     return svm

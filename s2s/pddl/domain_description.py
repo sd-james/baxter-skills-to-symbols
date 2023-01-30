@@ -26,8 +26,8 @@ class PDDLDomain:
         requirements = '(:requirements :strips{}{})'.format(' :probabilistic-effects' if self._probabilistic else '',
                                                             ' :rewards' if self._rewards else '')
 
-        symbols = '({})\n'.format(Proposition.not_failed()) + '\n'.join(
-            ['({})'.format(x) for x in self._vocabulary])
+        symbols = '{}\n'.format(Proposition.not_failed()) + '\n'.join(
+            ['{}'.format(x) for x in self._vocabulary])
 
         predicates = '(:predicates\n{}\n)'.format(indent(symbols))
 
@@ -51,16 +51,16 @@ class PDDLDomain:
         return description
 
 
-    def to_simple(self):
-        predicates = ' '.join(['({})'.format(Proposition.not_failed())] + ['({})'.format(x) for x in self._vocabulary])
-
-        operators = '\n'.join(
-            [str(SimplePrettyPrint(x, i, self._probabilistic, self._rewards, self._env.describe_option)) for i, x in
-             enumerate(self._operators)])
-
-        description = 'predicates:{}\nn_operators:{}\n\n{}'.format(
-            predicates,
-            len(self._operators),
-            operators
-        )
-        return description
+    # def to_simple(self):
+    #     predicates = ' '.join(['({})'.format(Proposition.not_failed())] + ['({})'.format(x) for x in self._vocabulary])
+    #
+    #     operators = '\n'.join(
+    #         [str(SimplePrettyPrint(x, i, self._probabilistic, self._rewards, self._env.describe_option)) for i, x in
+    #          enumerate(self._operators)])
+    #
+    #     description = 'predicates:{}\nn_operators:{}\n\n{}'.format(
+    #         predicates,
+    #         len(self._operators),
+    #         operators
+    #     )
+    #     return description

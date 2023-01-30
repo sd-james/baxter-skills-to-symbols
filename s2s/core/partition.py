@@ -1,3 +1,4 @@
+import copy
 import warnings
 from collections import defaultdict, ChainMap
 from functools import partial
@@ -11,9 +12,11 @@ from sklearn.cluster import DBSCAN
 
 from s2s.core.partitioned_option import PartitionedOption
 from s2s.union_find import UnionFind
-from s2s.utils import show, pd2np, select_rows, run_parallel
+from s2s.utils import show, pd2np, select_rows, run_parallel, flatten, IndexLink
 
 __author__ = 'Steve James and George Konidaris'
+
+from s2s.utils import run_parallel, show
 
 
 def partition_options(env: gym.Env, transition_data: pd.DataFrame,
@@ -47,6 +50,7 @@ def _partition_options(options: Iterable[int], transition_data: pd.DataFrame,
                        verbose=False, **kwargs) -> Dict[int, List[PartitionedOption]]:
     partitioned_options = dict()
     for option in options:
+
         show('Partitioning option {}'.format(option), verbose)
         # partition based on data from the current option
         partitioned_options[option] = _partition_option(option,
@@ -72,11 +76,19 @@ def _num_clusters(X: np.ndarray, epsilon: float, min_samples: int) -> int:
 def _is_overlap_init(A: pd.DataFrame, B: pd.DataFrame, **kwargs):
     epsilon = kwargs.get('init_epsilon', 0.05)
     min_samples = kwargs.get('init_min_samples', 5)
-    X = pd2np(A['state'])
-    Y = pd2np(B['state'])
+
+    column = 'state'
+
+    X = flatten(A[column])
+    Y = flatten(B[column])
     data = np.concatenate((X, Y))
-    return _num_clusters(data, epsilon, min_samples) <= max(_num_clusters(X, epsilon, min_samples),
-                                                            _num_clusters(Y, epsilon, min_samples))
+
+    x_cluster = _num_clusters(X, epsilon, min_samples)
+    y_cluster = _num_clusters(Y, epsilon, min_samples)
+    if x_cluster * y_cluster == 0:
+        return False
+
+    return _num_clusters(data, epsilon, min_samples) <= max(x_cluster, y_cluster)
 
 
 def _partition_option(option: int, data: pd.DataFrame, verbose=False, **kwargs) -> List[PartitionedOption]:
@@ -87,30 +99,31 @@ def _partition_option(option: int, data: pd.DataFrame, verbose=False, **kwargs) 
     :param verbose: the verbosity level
     :return: a list of partitioned options
     """
-    data = data.reset_index(drop=True)  # reset the indices since the data is a subset of the full transition data
 
-    ####################################################### NEW ########################################################
-    masks = data['mask'].apply(tuple).unique()
-    to_drop = list()
-    for mask in masks:
-        indices = _select_where(data['mask'], mask)
-        if len(indices) < 3:
-            to_drop.extend(indices)
-    if len(to_drop) > 0:
-        data = data.drop([data.index[i] for i in to_drop])
-    data = data.reset_index(drop=True)  # reset the indices since the data is a subset of the full transition data
-    ####################################################### NEW ########################################################
+    epsilon = 5
+    if 'effect_epsilon' not in kwargs:
+        kwargs['effect_epsilon'] = epsilon
+    if 'init_epsilon' not in kwargs:
+        kwargs['init_epsilon'] = epsilon
 
+    data = data.reset_index(drop=True)  # reset the indices since the data is a subset of the full transition data
     partition_effects = list()
-    masks = data['mask'].apply(tuple).unique()
 
-    total_mask = {y for x in masks for y in x}
-    masks = [list(sorted(total_mask))]
-    for mask in masks:
-        samples = data.assign(mask=[mask] * len(data))  # NEW
-        # samples = data.reset_index(drop=True)
-        # samples = data.loc[_select_where(data['mask'], mask)].reset_index(drop=True)  # get samples with that mask
-        clusters = _cluster_effects(samples, mask, verbose=verbose, **kwargs)  # cluster based on effects
+    mask_column = 'mask'
+
+    # first split on objects, then mask!
+    objects = data['object_type'].unique()
+    for object in objects:
+
+        show("Processing object types {}".format(object), verbose)
+
+        samples = data.loc[_select_where(data['object_type'], object)].reset_index(
+            drop=True)  # get samples with that object
+
+        # the masks are meaningless because objects are shuffled. But we have the object types which is enough
+        # so let's use the masks to get all the data and then combine it and the do clustering
+        clusters = _cluster_effects(samples, verbose=verbose, **kwargs)  # cluster based on effects
+
 
         # TODO: this code could be improved/optimised, but will do that another time
         # now check if part of the data for each cluster should be extracted and placed in existing partition (because
@@ -139,30 +152,84 @@ def _partition_option(option: int, data: pd.DataFrame, verbose=False, **kwargs) 
             new_clusters.append(cluster)
             partition_effects.extend(new_clusters)
 
+
+        # for mask in masks:
+        #
+        #     samples = object_data.loc[_select_where(object_data[mask_column], mask)].reset_index(
+        #         drop=True)  # get samples with that mask
+        #     clusters = _cluster_effects(samples, mask, verbose=verbose, **kwargs)  # cluster based on effects
+        #
+        #     # TODO: this code could be improved/optimised, but will do that another time
+        #     # now check if part of the data for each cluster should be extracted and placed in existing partition (because
+        #     # initiation sets overlap)
+        #     for cluster in clusters:
+        #         new_clusters = list()
+        #         for i, existing_cluster in enumerate(partition_effects):
+        #
+        #             existing_shared, new_shared = _merge(existing_cluster, cluster, verbose=verbose, **kwargs)
+        #
+        #             if len(np.unique(existing_shared)) > 1:
+        #                 # split out old data
+        #                 # the existing cluster loses some data
+        #                 reduced_cluster = select_rows(existing_cluster, np.where(np.logical_not(existing_shared)))
+        #                 partition_effects[i] = reduced_cluster
+        #                 # that data gets added to a new cluster
+        #                 new_clusters.append(select_rows(existing_cluster, np.where(existing_shared)))
+        #
+        #             if len(np.unique(new_shared)) > 1:
+        #                 # split out new data
+        #                 # that data gets added to a new cluster
+        #                 new_clusters.append(select_rows(cluster, np.where(new_shared)))
+        #                 # the current cluster loses some data
+        #                 cluster = select_rows(cluster, np.where(np.logical_not(new_shared)))
+        #
+        #         new_clusters.append(cluster)
+        #         partition_effects.extend(new_clusters)
+
     show('{} cluster(s) found'.format(len(partition_effects)), verbose)
 
-    # we now have a set of distinct clusters (maximally split), but they may be over-partitioned.
+    partitioned_options = list()
+    for i, partition in enumerate(partition_effects):
+        partitioned_options.append(PartitionedOption(option, i, partition, [partition]))
+
+
+# we now have a set of distinct clusters (maximally split), but they may be over-partitioned.
     # Check overlap in initiation sets and merge into probabilistic option if so
 
-    union_find = UnionFind(range(len(partition_effects)))
-    for i in range(len(partition_effects) - 1):
-        for j in range(i + 1, len(partition_effects)):
-            show("Checking clusters {} and {}".format(i, j), verbose)
-            if _is_overlap_init(partition_effects[i], partition_effects[j], verbose=verbose, **kwargs):
-                # add to union find
-                show("\tMerging clusters {} and {}".format(i, j), verbose)
-                union_find.merge(i, j)  # these will be merged
+    # TODO can prob get away without this below
 
-    merged_clusters = defaultdict(list)  # groups of merged partitions
-    for cluster_idx in union_find:
-        group = union_find[cluster_idx]
-        merged_clusters[group].append(partition_effects[cluster_idx])
+    # look_similar = IndexLink()
+    # union_find = UnionFind(range(len(partition_effects)))
+    # for i in range(len(partition_effects) - 1):
+    #     for j in range(i + 1, len(partition_effects)):
+    #         # show("Checking clusters {} and {}".format(i, j), verbose)
+    #         if _is_overlap_init(partition_effects[i], partition_effects[j], verbose=verbose, **kwargs):
+    #
+    #             stochastic = True
+    #             # the init sets look the same. But if it's in non-Markov space, it may be an illusion, so check it
+    #             if stochastic:
+    #                 # add to union find
+    #                 show("\tMerging clusters {} and {}".format(i, j), verbose)
+    #                 union_find.merge(i, j)  # these will be merged
+    #             else:
+    #                 # actually a deterministic transition! Do not augment negative samples when partitioning
+    #                 show("\tClusters {} and {} look stochastic in non-Markov space, but are not".format(i, j), verbose)
+    #                 look_similar.add(i, j)
+    #
+    # # take the clusters that look like they have the same inits (but don't) and account for the fact that they may be
+    # # merged (unlikely, but could happen)
+    # look_similar.reduce(union_find)
+    #
+    # merged_clusters = defaultdict(list)  # groups of merged partitions
+    # for cluster_idx in union_find:
+    #     group = union_find[cluster_idx]
+    #     merged_clusters[group].append(partition_effects[cluster_idx])
 
     # now going to store in a data structure
-    partitioned_options = list()
-    for i, (_, partitions) in enumerate(merged_clusters.items()):
-        combined_data = pd.concat(partitions, ignore_index=True)
-        partitioned_options.append(PartitionedOption(option, i, combined_data, partitions))
+    # partitioned_options = list()
+    # for i, (_, partitions) in enumerate(merged_clusters.items()):
+    #     combined_data = pd.concat(partitions, ignore_index=True)
+    #     partitioned_options.append(PartitionedOption(option, i, combined_data, partitions, look_similar[i]))
 
     show('Total partitioned options: {}'.format(len(partitioned_options)), verbose)
 
@@ -183,8 +250,16 @@ def _merge(existing_cluster: pd.DataFrame, new_cluster: pd.DataFrame, verbose=Fa
     # TODO: this code could be improved/optimised, but will do that another time
     epsilon = kwargs.get('init_epsilon', 0.05)
     min_samples = kwargs.get('init_min_samples', 5)
-    X = pd2np(existing_cluster['state'])
-    Y = pd2np(new_cluster['state'])
+
+    column = 'state'  # we check the problem space information regardless because because if we did not (and the
+    # option was not in fact stochastic), we'd have to correct it later on. So just do it here
+
+    X = flatten(existing_cluster['state'])
+
+    Y = flatten(new_cluster['state'])
+
+    # X = flatten(existing_cluster[column])
+    # Y = flatten(new_cluster[column])
     data = np.concatenate((X, Y))
     labels = DBSCAN(eps=epsilon, min_samples=min_samples).fit_predict(data)
 
@@ -226,39 +301,41 @@ def _select_where(column: pd.Series, value) -> List[int]:
     return [i for i in range(len(column)) if np.array_equal(column[i], value)]
 
 
-def _cluster_effects(samples: pd.DataFrame, mask: List[int], verbose=False, **kwargs) -> List[pd.DataFrame]:
+def _cluster_effects(samples: pd.DataFrame, verbose=False, **kwargs) -> List[pd.DataFrame]:
     """
     Cluster samples based on their effects
     :param samples: the samples
-    :param mask: the state variables modified by the option
     :param verbose: the verbosity level
     :return: a list of data frames, which each element in the list representing a single cluster
     """
-    epsilon = kwargs.get('effect_epsilon', 0.05)
-    min_samples = kwargs.get('effect_min_samples', 5)
+    epsilon = kwargs.get('effect_epsilon', 1)
+    min_samples = kwargs.get('effect_min_samples', 1)
+    min_samples = max(3, min(10, len(samples) // 10))  # at least 3, at most 10
 
-    if min_samples == np.inf:
-
-        if len(samples) < 3:
-            return []
-
-        clusters = [samples]
-        # reset the index back to zero based
-        clusters = [cluster.reset_index(drop=True) for cluster in clusters]  # not in place
-        return clusters
+    # the masks are meaningless because objects are shuffled. But we have the object types which is enough
+    # so let's use the masks to get all the data and then combine it and the do clustering
 
     data = pd2np(samples['next_state'])  # convert to numpy
-    masked_data = data[:, mask]  # cluster only on state variables that changed
+    masked_data = np.stack([ row[mask] for row, mask in zip(data, samples['mask'])])
 
-    db = DBSCAN(eps=epsilon, min_samples=min_samples).fit(masked_data)
+    db = DBSCAN(eps=epsilon, min_samples=min_samples).fit(flatten(masked_data))  # flatten to 2d for clustering (n_samples x all_object_features)
     labels = db.labels_
+
+
+    # if len(mask) == 0:
+    #     # we're just going to assume that everything is one class!
+    #     labels = np.zeros(shape=(len(masked_data),))
+    #     if len(masked_data) < min_samples:
+    #         labels += -1
+    # else:
+    #     db = DBSCAN(eps=epsilon, min_samples=min_samples).fit(masked_data)
+    #     labels = db.labels_
     show("Found {}/{} noisy samples".format((labels == -1).sum(), len(labels)), verbose)
     clusters = list()
 
-    if all(elem == -1 for elem in labels):
+    if all(elem == -1 for elem in labels) and len(labels) > min_samples:
         warnings.warn("All datapoints classified as noise!")
         labels = np.zeros(shape=(len(labels)))
-
 
     for label in set(labels):
         if label == -1:
@@ -279,14 +356,17 @@ def _cluster_inits(samples: pd.DataFrame, verbose=False, **kwargs) -> List[pd.Da
     """
     epsilon = kwargs.get('init_epsilon', 0.03)
     min_samples = kwargs.get('init_min_samples', 3)
-    return _cluster_data(samples, 'state', epsilon, min_samples, verbose=verbose)
+
+    column = 'state'
+
+    return _cluster_data(samples, column, epsilon, min_samples, verbose=verbose)
 
 
 def _cluster_data(samples: pd.DataFrame, column_name: str, epsilon: float, min_samples: int,
                   verbose=False) -> List[pd.DataFrame]:
     data = samples[column_name]
     # TODO how to get a non object dtype out of pandas???
-    db = DBSCAN(eps=epsilon, min_samples=min_samples).fit(pd2np(data))
+    db = DBSCAN(eps=epsilon, min_samples=min_samples).fit(flatten(data))
     labels = db.labels_
     show("Found {}/{} noisy samples".format((labels == -1).sum(), len(labels)), verbose)
     clusters = list()

@@ -1,0 +1,20 @@
+
+
+Pickup Mug
+	Mug in coffee machine. Machine off, Mug fill -> Mug picked up
+	Mug in coffee machine. Machine on, Mug fill -> Mug picked up
+	Mug in coffee machine. Machine on, Mug empty -> Mug picked up
+	Mug on shelf, Mug empty -> Mug picked up
+
+TurnOnMachine
+	Mug in coffee machine. Machine off, Mug empty -> Machine on, Mug fill
+	Mug not in coffee machine. Machine off -> Machine on
+	Mug in coffee machine. Machine off -> Machine on
+
+TurnOffMachine
+	Machine on, holding mug -> Machine off
+	Machine on, not holding mug -> Machine off
+
+PutMugInMachine
+	Mug is held and machine is on, and mug is full OR mug is held and empty -> Mug in machine on counter and full
+	Mug is held and empty and machine is off -> Mug in machine on counter

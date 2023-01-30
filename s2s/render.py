@@ -144,11 +144,11 @@ def visualise_preconditions(directory: str,
             continue
 
         states = pd2np(states['state'], make_rectangle=True)
-        image = env.render_states(states[:, classifier.mask], alpha_object=1, alpha_player=1, mask=classifier.mask,
+        image = env.render_states(states[:, classifier.type_mask], alpha_object=1, alpha_player=1, mask=classifier.type_mask,
                                   masked=True, randomly_sample=False)
 
 
-        filename = '{}-{}-precondition-{}.bmp'.format(option_descriptor(option), partition, classifier.mask)
+        filename = '{}-{}-precondition-{}.bmp'.format(option_descriptor(option), partition, classifier.type_mask)
         Image.save(image, make_path(directory, filename), mode=mode(image))
 
 
@@ -165,10 +165,10 @@ def visualise_effects(directory: str, env, effects, verbose=False,
         for i, (prob, effect, _) in enumerate(effs):
 
             show("Visualising effect for option {}, partition {}".format(option, partition), verbose)
-            if len(effect.mask) == 0:
+            if len(effect.type_mask) == 0:
                 continue
-            image = env.render_states(effect.sample(n_samples), mask=effect.mask, masked=True, **kwargs)
-            filename = '{}-eff{}.{}-{}.bmp'.format(option_descriptor(option), partition, prob, list(effect.mask))
+            image = env.render_states(effect.sample(n_samples), mask=effect.type_mask, masked=True, **kwargs)
+            filename = '{}-eff{}.{}-{}.bmp'.format(option_descriptor(option), partition, prob, list(effect.type_mask))
             if len(image.shape) == 3:
                 mode = 'RGB'
             else:

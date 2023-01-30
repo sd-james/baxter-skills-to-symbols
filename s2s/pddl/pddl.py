@@ -65,15 +65,14 @@ class Proposition:
         return Proposition("notfailed", None)
 
     @staticmethod
-    def conjoin(propositions: Tuple['TypedPredicate']):
+    def conjoin(propositions: Tuple['Proposition']):
         if len(propositions) == 1:
             return propositions[0]
         conjunction = copy.deepcopy(propositions[0])
         for i in range(1, len(propositions)):
-            predicate = propositions[i]
-            conjunction._name += ' AND {}'.format(predicate.name)
-            conjunction._kde.conjoin(predicate._kde)
-            conjunction.types += predicate.types
+            proposition = propositions[i]
+            conjunction._name += ' AND {}'.format(proposition.name)
+            conjunction._kde.conjoin(proposition._kde)
         return conjunction
 
 
@@ -157,10 +156,7 @@ class TypedPredicate(Proposition):
 
         # this one is for generic predicates that aren't grounded or linked to parameters
         else:
-
-            var_names = [chr(ord('a') + i) for i in range(min(len(self.types), 26))]
-            if len(self.types) > 26:
-                var_names.extend([chr(ord('A') + i) for i in range(len(self.types) - 26)])
+            var_names = [chr(ord('a') + i) for i in range(len(self.types))]
             s = '{} {}'.format(self.name,
                                ' '.join(['?{} - type{}'.format(name, t) for name, t in
                                          zip(var_names, self.types)]))

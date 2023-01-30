@@ -5,16 +5,15 @@ from typing import Tuple
 import numpy as np
 from gym.spaces import Discrete
 
-from s2s.core.build_pddl import build_pddl, find_goal_symbols
-from s2s.core.explore import collect_data
+from s2s.core.build_pddl import build_pddl
 from s2s.core.learn_operators import learn_preconditions, learn_effects, combine_learned_operators
 from s2s.core.partition import partition_options
-from s2s.env.s2s_env import S2SEnv, S2SWrapper
+from s2s.env.s2s_env import S2SEnv
 from s2s.pddl.domain_description import PDDLDomain
 from s2s.pddl.problem_description import PDDLProblem
 from s2s.pddl.proposition import Proposition
 from s2s.render import visualise_partitions, visualise_symbols, visualise_preconditions, visualise_effects
-from s2s.utils import save, make_dir, show, load
+from s2s.utils import save, make_dir, show
 
 __author__ = 'Steve James and George Konidaris'
 
@@ -51,11 +50,6 @@ def build_model(env: S2SEnv,
 
     # 1. Collect data
     transition_data, initiation_data = env.get_transition_data(), env.get_init_data()
-    # transition_data, initiation_data = collect_data(S2SWrapper(env, options_per_episode),
-    #                                                 max_episode=n_episodes,
-    #                                                 verbose=verbose,
-    #                                                 n_jobs=n_jobs,
-    #                                                 **kwargs)
 
     # 2. Partition options
     partitions = partition_options(env,

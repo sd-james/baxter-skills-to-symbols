@@ -1,5 +1,6 @@
 from typing import Tuple, List, Generator
 
+from s2s.estimators.estimators import PreconditionClassifier, StateDensityEstimator, RewardRegressor
 from s2s.estimators.kde import KernelDensityEstimator
 from s2s.estimators.svc import SupportVectorClassifier
 from s2s.estimators.svr import SupportVectorRegressor
@@ -14,8 +15,8 @@ class LearnedOperator:
     and the effect
     """
 
-    def __init__(self, partitioned_option: PartitionedOption, precondition: SupportVectorClassifier,
-                 outcomes: List[Tuple[float, KernelDensityEstimator, SupportVectorRegressor]], task_id: int = None):
+    def __init__(self, partitioned_option: PartitionedOption, precondition: PreconditionClassifier,
+                 outcomes: List[Tuple[float, StateDensityEstimator, RewardRegressor]], task_id: int = None):
         #  self._partitioned_option = partitioned_option  # no need to save
         self._precondition = precondition
         self._outcomes = outcomes
@@ -35,7 +36,7 @@ class LearnedOperator:
         return hash(id)
 
     @property
-    def precondition(self):
+    def precondition(self) -> PreconditionClassifier:
         return self._precondition
 
     @property

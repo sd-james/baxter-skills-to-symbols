@@ -14,7 +14,7 @@ class PreconditionClassifier(ABC):
 
     @property
     @abstractmethod
-    def mask(self) -> List[int]:
+    def type_mask(self) -> List[int]:
         """
         Get the precondition mask
         """
@@ -31,7 +31,7 @@ class PreconditionClassifier(ABC):
         pass
 
     @abstractmethod
-    def probability(self, states: np.ndarray) -> float:
+    def probability(self, states: np.ndarray, **kwargs) -> float:
         """
         Compute the probability of the state given the learned classifier
         :param states: the states

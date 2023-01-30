@@ -1,11 +1,12 @@
-from typing import Callable
+import copy
+from typing import Callable, Optional
 
 from s2s.estimators.estimators import StateDensityEstimator
 from s2s.estimators.kde import KernelDensityEstimator
 
 __author__ = 'Steve James and George Konidaris'
 
-from s2s.pddl.proposition import Proposition
+from s2s.pddl.pddl import Proposition
 
 
 class UniquePredicateList:
@@ -14,7 +15,7 @@ class UniquePredicateList:
     The list automatically deals with duplicates
     """
 
-    def __init__(self, comparator: Callable[[KernelDensityEstimator, KernelDensityEstimator], bool] = None):
+    def __init__(self, comparator: Optional[Callable[[KernelDensityEstimator, KernelDensityEstimator], bool]] = None):
         """
         Create a list data structure that ensues no duplicates are added to the list
         :param comparator: a function that accepts two objects and returns whether they are equal
@@ -25,7 +26,12 @@ class UniquePredicateList:
         self._goal_predicates = list()
         self.__idx = 0
 
-    def append(self, item: StateDensityEstimator, start_predicate=False, goal_predicate=False) -> Proposition:
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state['_comparator'] = None  # pickle no likee the comparator.
+        return state
+
+    def append(self, item: Proposition, start_predicate=False, goal_predicate=False) -> Proposition:
         """
         Add an item to the list
         :param item: the item to add
@@ -34,12 +40,18 @@ class UniquePredicateList:
         :return: the predicate in the list. If the item is a duplicate, the predicate will refer to the
         existing item in the list
         """
+
+        if self._comparator is None:
+            raise ValueError("Cannot add more items to structure. If this object has been unpickled, reset the "
+                             "comparator and try again.")
+
         for x in self._list:
-            if self._comparator(item, x.estimator):
+            if self._comparator(item.estimator, x.estimator):
                 self._add(x, start_predicate, goal_predicate)
                 return x
         idx = len(self._list)
-        predicate = Proposition('symbol_{}'.format(idx), item)
+        predicate = copy.deepcopy(item)
+        predicate._name = 'symbol_{}'.format(idx)
         self._list.append(predicate)
         self._add(predicate, start_predicate, goal_predicate)
         return predicate

@@ -3,7 +3,7 @@ from typing import List
 import cv2
 import numpy as np
 
-from s2s.baxter_env import BaxterEnv, BaxterEnvVec
+from s2s.aosm_env import AosmEnv, AosmEnvVec
 from s2s.core.build_model import build_model
 from s2s.pddl.domain_description import PDDLDomain
 from s2s.planner.mgpt_planner import mGPT
@@ -44,7 +44,7 @@ from s2s.view_images import reshape
 if __name__ == '__main__':
 
     save_dir = '../data/output/baxter_data_vec'
-    env = BaxterEnvVec()
+    env = AosmEnvVec()
     env.load("../data/input/baxter_images_webcam_plates/action_webcam_with_april_fixed_formatting.txt",
              "../data/input/baxter_images_webcam_plates/valid_actions_webcam_with_april_fixed_formatting.txt")
 
