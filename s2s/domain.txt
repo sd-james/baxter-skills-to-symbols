@@ -1,0 +1,42 @@
+predicates:((notfailed)) ((symbol_0 ?a - type44)) ((symbol_1 ?a - type33)) ((symbol_2 ?a - type2)) ((symbol_3 ?a - type33)) ((symbol_4 ?a - type44)) ((symbol_5 ?a - type14)) ((symbol_6 ?a - type33)) ((symbol_7 ?a - type44)) ((symbol_8 ?a - type2)) ((symbol_9 ?a - type33)) ((symbol_10 ?a - type44))
+n_operators:10
+
+PickupObject-partition-0-0
+((notfailed)) ((symbol_9 ?a - type33)) ((symbol_7 ?a - type44))
+1.0:((symbol_0 ?a - type44)) ((symbol_6 ?a - type33)) ((symbol_2 ?a - type2));((symbol_7 ?a - type44)) ((symbol_8 ?a - type2)) ((symbol_9 ?a - type33))
+
+PickupObject-partition-1-1
+((notfailed)) ((symbol_3 ?a - type33))
+1.0:((symbol_0 ?a - type44)) ((symbol_1 ?a - type33)) ((symbol_2 ?a - type2));((symbol_3 ?a - type33)) ((symbol_4 ?a - type44)) ((symbol_7 ?a - type44)) ((symbol_8 ?a - type2)) ((symbol_10 ?a - type44))
+
+PickupObject-partition-2-2
+((notfailed)) ((symbol_10 ?a - type44))
+1.0:((symbol_4 ?a - type44)) ((symbol_6 ?a - type33)) ((symbol_2 ?a - type2));((symbol_1 ?a - type33)) ((symbol_3 ?a - type33)) ((symbol_8 ?a - type2)) ((symbol_9 ?a - type33)) ((symbol_10 ?a - type44))
+
+ToggleObjectOn-partition-0-3
+((notfailed)) ((symbol_10 ?a - type44))
+1.0:((symbol_7 ?a - type44)) ((symbol_3 ?a - type33));((symbol_1 ?a - type33)) ((symbol_6 ?a - type33)) ((symbol_9 ?a - type33)) ((symbol_10 ?a - type44))
+
+ToggleObjectOn-partition-1-4
+((notfailed)) ((symbol_6 ?a - type33))
+1.0:((symbol_1 ?a - type33));((symbol_6 ?a - type33))
+
+ToggleObjectOff-partition-0-5
+((notfailed)) ((symbol_3 ?a - type33))
+1.0:((symbol_9 ?a - type33));((symbol_3 ?a - type33))
+
+ToggleObjectOff-partition-1-6
+((notfailed)) ((symbol_1 ?a - type33))
+1.0:((symbol_6 ?a - type33));((symbol_1 ?a - type33))
+
+PutObject-partition-0-7
+((notfailed)) ((symbol_1 ?a - type33)) ((symbol_0 ?a - type44))
+1.0:((symbol_7 ?a - type44)) ((symbol_3 ?a - type33)) ((symbol_8 ?a - type2));((symbol_0 ?a - type44)) ((symbol_1 ?a - type33)) ((symbol_2 ?a - type2))
+
+PutObject-partition-0-8
+((notfailed)) ((symbol_1 ?a - type33)) ((symbol_4 ?a - type44))
+1.0:((symbol_7 ?a - type44)) ((symbol_3 ?a - type33)) ((symbol_8 ?a - type2));((symbol_1 ?a - type33)) ((symbol_2 ?a - type2)) ((symbol_4 ?a - type44))
+
+PutObject-partition-1-9
+((notfailed)) ((symbol_6 ?a - type33)) ((symbol_4 ?a - type44))
+1.0:((symbol_10 ?a - type44)) ((symbol_9 ?a - type33)) ((symbol_8 ?a - type2));((symbol_2 ?a - type2)) ((symbol_4 ?a - type44)) ((symbol_6 ?a - type33))
