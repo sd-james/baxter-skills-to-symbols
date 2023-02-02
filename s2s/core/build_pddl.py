@@ -21,7 +21,8 @@ from s2s.pddl.unique_list import UniquePredicateList
 
 __author__ = 'Steve James and George Konidaris'
 
-from s2s.utils import show, pd2np, range_without, run_parallel, flatten, save, load, get_start_state
+from s2s.utils import show, pd2np, range_without, run_parallel, flatten, save, load, get_start_state, \
+    load_start_state_non_spatial, load_start_state_spatial
 
 """
 Different similar symbol thing!
@@ -131,14 +132,20 @@ def _generate_start_symbols(transition_data: pd.DataFrame, factors: List[List[in
 
     # group by episode and get the first state from each
     column = 'state'
-    initial_states =  get_start_state(transition_data)
+    # initial_states =  get_start_state(transition_data)
+
+    if get_start_state(transition_data).shape[1] == 78:
+        initial_states = load_start_state_spatial()
+    else:
+        initial_states = load_start_state_non_spatial()
+
     # initial_states = pd2np(transition_data.groupby('episode').nth(0)[column], make_rectangle=True)
     # initial_states = initial_states[1:2] # just take the first!
     return reversed(_generate_symbols(initial_states, factors, verbose=verbose, **kwargs))
 
 
 def find_type(objects, type):
-    return [object for object in objects if object[-1] == type]
+    return [object for object in objects if round(object[-1]) == round(type)]
 
 
 def mask_on_object_type(data, types):

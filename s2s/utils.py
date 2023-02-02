@@ -138,7 +138,9 @@ def flatten(data: Union[pd.Series, np.ndarray], mask: Optional[List[int]] = None
     if isinstance(data, np.ndarray):
         return np.array([np.concatenate(sample[mask]).ravel() for sample in data])
     if isinstance(data[0].dtype, Number) or data[0].dtype == np.float64 or data[0].dtype == np.float32:
-        return np.array([sample[mask] for sample in data])
+        temp = np.array([sample[mask] for sample in data])
+        if len(temp.shape) == 2:
+            return temp
     return np.array([np.concatenate(sample[mask]).ravel() for sample in data])
 
 
@@ -208,6 +210,14 @@ def load(filename=None, binary=True, use_dill=False):
 def get_start_state(transition_data):
     initial_states = pd2np(transition_data.groupby('episode').nth(0)['state'], make_rectangle=True)
     return initial_states[1:2] # just take the first!
+
+
+def load_start_state_spatial():
+    return load('start_state_spatial.pkl')
+
+
+def load_start_state_non_spatial():
+    return load('start_state_non_spatial.pkl')
 
 
 def get_dir_name(file):

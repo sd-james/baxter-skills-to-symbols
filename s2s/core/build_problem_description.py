@@ -17,7 +17,7 @@ from s2s.estimators.svc import SupportVectorClassifier
 from s2s.pddl.pddl import Proposition, TypedPredicate, IdentityFluent
 from s2s.pddl.problem_description import PDDLProblem
 # from s2s.portable.problem_symbols import _ProblemProposition
-from s2s.utils import flatten, show, pd2np, get_start_state
+from s2s.utils import flatten, show, pd2np, get_start_state, load_start_state_non_spatial, load_start_state_spatial
 
 
 def find_match(state, type, predicates):
@@ -47,7 +47,13 @@ def build_problem_description(env: S2SEnv, predicates: Iterable[Proposition],
     problem_name = kwargs.get('problem_name', 'p1')
     pddl_problem = PDDLProblem(problem_name, env.name)
 
-    start_state = np.squeeze(get_start_state(transition_data))
+    # start_state = np.squeeze(get_start_state(transition_data))
+
+    if n_objects == 77:
+        start_state = np.squeeze(load_start_state_non_spatial())
+    else:
+        start_state = np.squeeze(load_start_state_spatial())
+
     object_types = [x[-1] for x in start_state]
     object_names = [describe_object(i, object_types[i]) for i in range(n_objects)]
 

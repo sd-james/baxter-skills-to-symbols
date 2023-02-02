@@ -129,7 +129,7 @@ class mGPT:
             show("Starting mdpsim...", verbose)
             # now run mdpsim with the temp file as input
             p = Popen(
-                [command,
+                 [ #command,
                  self._mdpsim_path,
                  '--port',
                  '{}'.format(self._mdpsim_port),
@@ -156,14 +156,14 @@ class mGPT:
             show("Starting mGPT...", verbose)
             # it's running well! now start planner
             p2 = Popen(
-                [command,
+                [ # command,
                  self._planner_path,
                  '-v',
                  '100',
                  '-p',
-                 self._planner.value,
+                 self._planner.value[0],
                  '-h',
-                 self._heuristic.value,
+                 self._heuristic.value[0],
                  'localhost:{}'.format(self._mdpsim_port),
                  temp_name,
                  problem_name

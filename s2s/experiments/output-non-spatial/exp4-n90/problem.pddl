@@ -1,0 +1,1 @@
+need at least one array to concatenate

@@ -136,7 +136,13 @@ class AosmEnv(S2SEnv):
             new_state[object_id] = state[i]
         return new_state
 
-    def load(self, file):
+    def extend(self, state):
+        inject = [0] * 104
+        inject[-1] = -1
+        state = state[0:4] + inject + state[4:]
+        return state
+
+    def load(self, file, max_transitions=np.inf):
 
         with open(file, 'rb') as f:
             data = pickle.load(f)
@@ -147,7 +153,15 @@ class AosmEnv(S2SEnv):
 
             n_dimensions = 108
 
+            count = 0
             for (state, action, next_state, done), description in zip(data[0], data[2]):
+
+                if count == max_transitions:
+                    break
+
+                if len(state) % n_dimensions != 0:
+                    state = self.extend(state)
+                    next_state = self.extend(next_state)
 
                 state = np.reshape(state, (-1, n_dimensions))
                 next_state = np.reshape(next_state, (-1, n_dimensions))
@@ -157,19 +171,31 @@ class AosmEnv(S2SEnv):
                 next_state = next_state[next_state[:, -1].argsort()]
 
                 mask = self.compute_mask(state, next_state)
-                object_type = tuple(state[mask][:, -1])  # we have the object type, so let's use it!
+                object_type = tuple(state[mask][:, -1].astype(int))  # we have the object type, so let's use it!
                 self.transition_data.loc[len(self.transition_data)] = [episode, state, action, object_type,
                                                                        next_state,
                                                                        done, mask]
                 if done:
                     episode += 1
+                count += 1
 
+            seen_states = set()
             for (state, option, can_execute), desc in zip(data[1], data[2]):
+
+                # PROCESS ONLY N UNIQUE STATES!
+                temp = hash(tuple(state))
+                if len(seen_states) < max_transitions:
+                    seen_states.add(temp)
+                if len(seen_states) >= max_transitions:
+                    if temp not in seen_states:
+                        continue
+
+                if len(state) % n_dimensions != 0:
+                    state = self.extend(state)
+
                 state = np.reshape(state, (-1, n_dimensions))
                 state = state[state[:, -1].argsort()]
                 self.init_data.loc[len(self.init_data)] = [state, option, bool(can_execute)]
-
-
 
     # def load(self, file):
     #

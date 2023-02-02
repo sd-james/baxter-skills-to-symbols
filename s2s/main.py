@@ -8,7 +8,7 @@ from s2s.describe import describe_partitions, describe_symbol
 from s2s.pddl.domain import PDDLDomain
 from s2s.pddl.problem_description import PDDLProblem
 from s2s.pddl.proposition import Proposition
-from s2s.utils import save, load, indent
+from s2s.utils import save, load, indent, get_start_state
 import numpy as np
 
 
@@ -24,12 +24,15 @@ if __name__ == '__main__':
     transition_data, initiation_data = load('data.pkl')
 
     # 2. Partition options
-    # partitions = partition_options(env,
-    #                                transition_data,
-    #                                effect_epsilon=0.001,
-    #                                init_epsilon=0.001,
-    #                                verbose=True,
-    #                                n_jobs=6)
+    partitions = partition_options(env,
+                                   transition_data,
+                                   effect_epsilon=0.001,
+                                   init_epsilon=0.001,
+                                   verbose=True,
+                                   n_jobs=1)
+
+    exit(0)
+
     #
     # save(partitions, 'partitions.pkl')
 
@@ -77,9 +80,9 @@ if __name__ == '__main__':
     # save(typed_pddl, 'typed_domain.pkl')
     # save(typed_pddl, 'typed_domain.pddl', binary=False)
 
-    typed_pddl = load('typed_domain.pkl')
-    save(typed_pddl, 'typed_domain.pddl', binary=False)
-    exit(0)
+    # typed_pddl = load('typed_domain.pkl')
+    # save(typed_pddl, 'typed_domain.pddl', binary=False)
+    # exit(0)
 
     # vocabulary = load('predicates.pkl')
     # for x in vocabulary:
