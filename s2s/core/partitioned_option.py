@@ -100,17 +100,26 @@ class PartitionedOption:
                                             'next_state'], make_rectangle=True), pd2np(
                 frame['mask']).astype(int)
 
-    def masked_effects(self):
+    def masked_effects(self, force_spatial=False):
         for prob, states, next_states, masks in self.effects():
-            yield prob, self.get_masked_data(states, masks), self.get_masked_data(next_states, masks)
+            yield prob, self.get_masked_data(states, masks, force_spatial), self.get_masked_data(next_states, masks, force_spatial)
 
-    def masked_states(self):
-        x = np.array([states for _, states, _ in self.masked_effects()])
+    def masked_states(self, force_spatial=False):
+        x = np.array([states for _, states, _ in self.masked_effects(force_spatial)])
         if len(x.shape) == 4:
             x = np.squeeze(x, axis=0)
         return x
 
-    def get_masked_data(self, data, masks):
+    def get_masked_data(self, data, masks, force_spatial=False):
+
+        if force_spatial:
+            new_masks = list()
+            for mask in masks:
+                if 0 not in mask:
+                    mask = np.array([0] + list(mask))
+                new_masks.append(mask)
+            return np.stack([row[sorted(mask)] for row, mask in zip(data, new_masks)])
+
         return np.stack([row[sorted(mask)] for row, mask in zip(data, masks)])
 
 
@@ -124,3 +133,38 @@ class PartitionedOption:
         other_view = View.PROBLEM if self._view == View.OBJECT else View.OBJECT  # swap the view around
         from s2s.core.partition import _partition_option
         return _partition_option(self.option, self._combined_data, verbose=verbose, view=other_view, **kwargs)
+
+
+    def _vis_effects(self):
+        x = list()
+        z = list()
+        o = list()
+
+        for _, _, next_states, _ in self.effects():
+            for state in next_states:
+                x.append(state[0][0])
+                z.append(state[0][2])
+                o.append(state[0][3] / 360)
+
+        print(x)
+        print(z)
+        print("*******************************")
+        x = list()
+        z = list()
+        o = list()
+
+
+
+        for _, _, states in self.masked_effects():
+            for state in states:
+                x.append(state[0][0])
+                z.append(state[0][2])
+                o.append(state[0][3] / 360)
+
+        print(x)
+        print(z)
+        import matplotlib.pyplot as plt
+        plt.xlim(-1, 1)
+        plt.ylim(-1, 1)
+        plt.scatter(x, z, c=o)
+        plt.show()

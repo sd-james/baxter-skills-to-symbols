@@ -100,11 +100,17 @@ def _partition_option(option: int, data: pd.DataFrame, verbose=False, **kwargs) 
     :return: a list of partitioned options
     """
 
+
+
     epsilon = 5
     if 'effect_epsilon' not in kwargs:
         kwargs['effect_epsilon'] = epsilon
     if 'init_epsilon' not in kwargs:
         kwargs['init_epsilon'] = epsilon
+
+    if option in [4,5]:
+        kwargs['effect_epsilon'] = 0.3
+        kwargs['init_epsilon'] = kwargs['effect_epsilon']
 
     data = data.reset_index(drop=True)  # reset the indices since the data is a subset of the full transition data
     partition_effects = list()
@@ -122,7 +128,7 @@ def _partition_option(option: int, data: pd.DataFrame, verbose=False, **kwargs) 
 
         # the masks are meaningless because objects are shuffled. But we have the object types which is enough
         # so let's use the masks to get all the data and then combine it and the do clustering
-        clusters = _cluster_effects(samples, verbose=verbose, **kwargs)  # cluster based on effects
+        clusters = _cluster_effects(samples, verbose=verbose, option=option, **kwargs)  # cluster based on effects
 
 
         # TODO: this code could be improved/optimised, but will do that another time
@@ -191,6 +197,7 @@ def _partition_option(option: int, data: pd.DataFrame, verbose=False, **kwargs) 
     partitioned_options = list()
     for i, partition in enumerate(partition_effects):
         partitioned_options.append(PartitionedOption(option, i, partition, [partition]))
+
 
 
 # we now have a set of distinct clusters (maximally split), but they may be over-partitioned.
@@ -318,6 +325,14 @@ def _cluster_effects(samples: pd.DataFrame, verbose=False, **kwargs) -> List[pd.
     data = pd2np(samples['next_state'])  # convert to numpy
     masked_data = np.stack([ row[mask] for row, mask in zip(data, samples['mask'])])
 
+    # if False and kwargs.get('option', 0) == 4:
+    #     for epsilon in [0.001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 1, 2]:
+    #         temp = set(DBSCAN(eps=epsilon, min_samples=min_samples).fit(flatten(masked_data)) .labels_)
+    #         if -1 in temp:
+    #             temp.remove(-1)
+    #         print(epsilon, len(temp))
+    #     exit(0)
+
     db = DBSCAN(eps=epsilon, min_samples=min_samples).fit(flatten(masked_data))  # flatten to 2d for clustering (n_samples x all_object_features)
     labels = db.labels_
 
@@ -344,6 +359,26 @@ def _cluster_effects(samples: pd.DataFrame, verbose=False, **kwargs) -> List[pd.
         clusters.append(samples.loc[np.where(labels == label)])
     # reset the index back to zero based
     clusters = [cluster.reset_index(drop=True) for cluster in clusters]  # not in place
+
+    # if kwargs.get('option', 0) == 4:
+    #
+    #     for cluster in clusters:
+    #         sx = list()
+    #         sz = list()
+    #         for state in pd2np(cluster['next_state']):
+    #             x = state[0][0]
+    #             z = state[0][2]
+    #             sx.append(x)
+    #             sz.append(z)
+    #
+    #         import matplotlib.pyplot as plt
+    #         plt.xlim(-1, 1)
+    #         plt.ylim(-1, 1)
+    #         plt.scatter(sx, sz)
+    #         plt.show()
+    # #     exit(0)
+
+
     return clusters
 
 

@@ -118,7 +118,7 @@ def _extract_types(data):
     for row in data:
         types = list()
         for object in row:
-            types.append(object[-1])
+            types.append(int(round(object[-1])))
         if ret is None:
             ret = types
         elif ret != types:
@@ -127,7 +127,7 @@ def _extract_types(data):
 
 
 def find_type(objects, type):
-    return [object for object in objects if object[-1] == type]
+    return [object for object in objects if int(round(object[-1])) == type]
 
 def mask_on_object_type(negatives, positives):
 
@@ -151,14 +151,18 @@ def _learn_preconditions(init_data: pd.DataFrame, partitioned_options: List[Part
         option = partition.option
 
         # this property gets either agent or problem-space states, whichever was used to partition in the first place
-        # now we need to work out the masked data!
-        positive_samples = partition.masked_states()
 
         negative_data = pd2np(init_data.loc[(init_data['option'] == option) &
                                             # (init_data['object'] == partition.object) &
                                             (init_data['can_execute'] == False)
                                             ][state_column], make_rectangle=True)
         # must do equals False because Pandas!
+        # if len(negative_data) == 0:
+        #     continue
+        n_objects = negative_data.shape[1]
+
+        # now we need to work out the masked data!
+        positive_samples = partition.masked_states(n_objects==78)
 
         # compute only the masked negative stuff
         negative_data, type_mask = mask_on_object_type(negative_data, positive_samples)
@@ -168,8 +172,11 @@ def _learn_preconditions(init_data: pd.DataFrame, partitioned_options: List[Part
         if kwargs.get('augment_negative', False):
             # augment negative samples from the initiation sets of the other partitions
             additional = _augment_negative(partition.partition, all_partitions[option])
-            additional, _ = mask_on_object_type(additional, positive_samples)
-            negative_samples = np.vstack((negative_data, additional))
+            if len(additional) == 0:
+                negative_samples = negative_data
+            else:
+                additional, _ = mask_on_object_type(additional, positive_samples)
+                negative_samples = np.vstack((negative_data, additional))
         else:
             negative_samples = negative_data
 
@@ -177,7 +184,7 @@ def _learn_preconditions(init_data: pd.DataFrame, partitioned_options: List[Part
 
         show("Calculating mask for option {}, partition {} ...".format(partition.option, partition.partition), verbose)
         precondition = _learn_precondition(partition, positive_samples, negative_samples, type_mask=type_mask,
-                                           verbose=verbose, **kwargs)
+                                           verbose=verbose, n_objects=n_objects, **kwargs)
         preconditions[(option, partition.partition)] = precondition
         prev_option = option
     return preconditions
@@ -200,6 +207,8 @@ def _augment_negative(current_partition: int,
             continue  # ignore those partitions that look similar in agent space, since this will break the precondition
         # this property gets either agent or problem-space states, whichever was used to partition in the first place
         negatives.append(partition.states)  # add the others as negatives
+    if len(negatives) == 0:
+        return negatives
     return np.vstack(negatives)
 
 

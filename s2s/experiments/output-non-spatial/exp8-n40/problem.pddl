@@ -1,1 +1,1 @@
-need at least one array to concatenate
+Can't find starting predicate!

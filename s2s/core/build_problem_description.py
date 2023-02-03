@@ -26,6 +26,13 @@ def find_match(state, type, predicates):
 
         if predicate.mask != [type]:
             continue
+        if type == -1:
+            # robot!
+            # can only be this one!
+            return predicate
+            # if np.linalg.norm(predicate.sample(1)[0] - state, 1) < 0.01:
+            #     return predicate
+
         if np.allclose(np.rint(predicate.sample(1)[0].astype(float)), state):
             return predicate
     raise ValueError("Can't find starting predicate!")
@@ -54,7 +61,7 @@ def build_problem_description(env: S2SEnv, predicates: Iterable[Proposition],
     else:
         start_state = np.squeeze(load_start_state_spatial())
 
-    object_types = [x[-1] for x in start_state]
+    object_types = [round(x[-1]) for x in start_state]
     object_names = [describe_object(i, object_types[i]) for i in range(n_objects)]
 
 
@@ -75,9 +82,9 @@ def build_problem_description(env: S2SEnv, predicates: Iterable[Proposition],
 
     # TODO: hack - the are independent factors, then one large one! Deal with large separately by ignoring!
     for i, object in enumerate(start_state):
-        if [object[-1]] in factors:
+        if [int(round(object[-1]))] in factors:
             # a single one!
-            predicate = find_match(object, object[-1], predicates.start_predicates)
+            predicate = find_match(object, int(round(object[-1])), predicates.start_predicates)
             pddl_problem.add_start_proposition(predicate(object_names[i]))
 
 
@@ -199,10 +206,10 @@ def find_goal_symbols(factors: List[List[int]], vocabulary: Iterable[Proposition
     goals = list()
     for type in goal_types:
         for i, object in enumerate(positive_samples[0]):
-            if object[-1] == type:
+            if int(round(object[-1])) == type:
                 # from describe import describe_data
                 # describe_data(np.expand_dims(object, axis=0))
-                predicate = find_match(object, object[-1], vocabulary)
+                predicate = find_match(object, int(round(object[-1])), vocabulary)
                 goals.append((i, predicate))
 
     return goals

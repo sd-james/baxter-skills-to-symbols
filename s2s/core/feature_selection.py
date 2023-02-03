@@ -39,17 +39,19 @@ def _compute_object_precondition_mask(positive_samples: np.ndarray, negative_sam
     """
     threshold = kwargs.get('mask_addition_threshold', 0.007)
 
-    # for row in positive_samples:
-    #     for i, object in enumerate(row):
-    #         for object_id in object_ids:
-    #             if object[-1] in object_id:
-    #                 mask.append(i)
-    #                 break
-
     type_mask = sorted(list(set(type_mask)))
     index_mask = list(range(len(type_mask)))
 
     # TODO
+    n_objects = kwargs.get('n_objects', 77)
+    if n_objects == 77 or len(type_mask) == 1:
+        # non spatial
+        return type_mask, index_mask
+
+    elif n_objects != 78:
+        raise ValueError
+
+    #TESTING just always including!
     return type_mask, index_mask
 
 
@@ -60,6 +62,34 @@ def _compute_object_precondition_mask(positive_samples: np.ndarray, negative_sam
     # compute the score with ALL state variables
     latest_score, params = _get_orig_score_params(samples[:, index_mask], labels, **kwargs)
     show("Score with initial variables {}: {}".format(type_mask, latest_score), verbose)
+
+    # trying to remove agent
+    # TODO: VERY HARD CODED!
+
+    if type_mask[0] != -1:
+        raise ValueError
+
+    new_mask = [x for i, x in enumerate(index_mask) if i != 0]  # remove the first one
+    n_score = _get_subset_score(samples, labels, new_mask, params)
+
+    if latest_score - n_score < threshold:
+        # it did not go down!
+        show("Score not changed. Removing", verbose)
+        return type_mask[1:], new_mask
+
+    show("After removing, score was damaged by  {}. Keeping...".format(n_score - latest_score), verbose)
+
+    return type_mask, index_mask
+
+    # n_score = _get_subset_score(samples, labels, [0] + index_mask, params)
+    # if latest_score - n_score < threshold:
+    #     # improvement!
+    #     index_mask = [0] + index_mask
+    #     type_mask = [-1] + type_mask  # the type is always -1
+    #
+    # return type_mask, index_mask
+
+
 
     if len(type_mask) == 1:
         final_mask = type_mask

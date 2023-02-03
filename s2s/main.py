@@ -16,6 +16,8 @@ if __name__ == '__main__':
     save_dir = ''
 
     env = AosmEnv()
+
+    exit(0)
     # env.load("data/agent_centric_transitions_1000")
     # transition_data, initiation_data = env.get_transition_data(), env.get_init_data()
     # save((transition_data, initiation_data), 'data.pkl')
@@ -41,11 +43,11 @@ if __name__ == '__main__':
     # describe_partitions(partitions)
     # exit(0)
 
-    # preconditions = learn_preconditions(initiation_data,
-    #                                     partitions,
-    #                                     augment_negative=True,
-    #                                     verbose=True,
-    #                                     n_jobs=8)
+    preconditions = learn_preconditions(initiation_data,
+                                        partitions,
+                                        augment_negative=True,
+                                        verbose=True,
+                                        n_jobs=8)
     # save(preconditions, 'preconditions.pkl')
 
     preconditions = load('preconditions.pkl')

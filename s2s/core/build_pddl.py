@@ -48,6 +48,9 @@ def _old_comparator(a: StateDensityEstimator, b: StateDensityEstimator) -> bool:
     if set(a.mask) != set(b.mask):
         return False
 
+    if -1 in a.mask:
+        return np.linalg.norm(a.sample(1)[0] - b.sample(1)[0], 1) < 0.01
+
     x = np.rint(a.sample(1)[0].astype(float))
     y = np.rint(b.sample(1)[0].astype(float))
 
@@ -145,7 +148,7 @@ def _generate_start_symbols(transition_data: pd.DataFrame, factors: List[List[in
 
 
 def find_type(objects, type):
-    return [object for object in objects if round(object[-1]) == round(type)]
+    return [object for object in objects if int(round(object[-1])) == round(type)]
 
 
 def mask_on_object_type(data, types):
@@ -202,7 +205,7 @@ def build_pddl(env, transition_data: pd.DataFrame, operators: List[LearnedOperat
     :return: the factors, predicates and PDDL operators
     """
     n_jobs = kwargs.get('n_jobs', 1)
-    n_types = 45
+    n_types = kwargs.get('n_types', 45)
     # n_objects = env.n_dims(kwargs.get('view', View.PROBLEM))
 
     vocabulary = UniquePredicateList(_old_comparator)
@@ -241,6 +244,7 @@ def build_pddl(env, transition_data: pd.DataFrame, operators: List[LearnedOperat
     n_start_propositions = len(vocabulary)
     show("Start position generated {} propositions".format(n_start_propositions), verbose)
 
+
     # save(vocabulary)
     # exit(0)
     # vocabulary = load()
@@ -260,9 +264,12 @@ def build_pddl(env, transition_data: pd.DataFrame, operators: List[LearnedOperat
     operator_predicates = _generate_vocabulary(vocabulary, operators, factors, verbose=verbose, n_jobs=n_jobs)
     show("Total propositions: {}".format(len(vocabulary)), verbose)
 
-    # for x in vocabulary:
-    #     from s2s.describe import describe_symbol
-    #     describe_symbol(x)
+    # for pred in vocabulary:
+    #     if -1 in pred.mask:
+    #         from s2s.main2 import vis_dist
+    #         vis_dist(pred.name, pred)
+    # exit(0)
+
 
     show("Generating full PDDL...", verbose)
 
@@ -381,7 +388,7 @@ def _build_pddl_operator(n_dims: int, precondition_factors: List[List[int]], ope
         candidates.append([predicate for predicate in vocabulary if set(predicate.types) == set(factor)])
 
     high_threshold = kwargs.get('high_threshold', 0.95)
-    low_threshold = kwargs.get('low_threshold', 0.6)
+    low_threshold = kwargs.get('low_threshold', 0.1)
 
     # when intersecting propositions with preconditions allow for the effects to be a subspace of the precondition
     # (and have the missing variables randomly sampled)
@@ -561,7 +568,13 @@ def _modifies(operators: List[LearnedOperator], n_variables: int) -> Dict[int, L
     :return: For each state variable, a list of option-effect pairs that modify it
     """
     modifies = dict()
-    for x in range(n_variables):
+
+    if n_variables == 46:
+        vars = list(range(-1, 45))
+    else:
+        vars = list(range(0, 45))
+
+    for x in vars:
         new_mods = list()
         for i, operator in enumerate(operators):
             for v, (_, effect, _) in enumerate(operator.outcomes()):
@@ -585,7 +598,12 @@ def _factorise(operators: List[LearnedOperator], n_variables: int, verbose=True)
     factors = list()
     options = list()
 
-    for i in range(n_variables):
+    if n_variables == 46:
+        vars = list(range(-1, 45))
+    else:
+        vars = list(range(0, 45))
+
+    for i in vars:
         found = False
         for x in range(len(factors)):
             f = factors[x]

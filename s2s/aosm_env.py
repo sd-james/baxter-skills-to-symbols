@@ -9,7 +9,7 @@ from s2s.env.s2s_env import S2SEnv
 
 class AosmEnv(S2SEnv):
 
-    def __init__(self):
+    def __init__(self, spatial=False):
         self.action_space = None
         self.observation_space = None
         self.actions = list()
@@ -20,8 +20,12 @@ class AosmEnv(S2SEnv):
             ["ToggleObjectOn", ["CoffeeMachine"]],
             ["ToggleObjectOff", ["CoffeeMachine"]],
             ["PutObject", ["CoffeeMachine", "Mug"]],
-            ["PutObject", ["CounterTop", "Mug"]],
+            # ["PutObject", ["CounterTop", "Mug"]],
         ]
+
+        if spatial:
+            self.action_obj_list.append(["NavigateTo", ["Mug"]])
+            self.action_obj_list.append(["NavigateTo", ["CoffeeMachine"]])
 
         self.actions = list()
         for x, _ in self.action_obj_list:
@@ -60,7 +64,6 @@ class AosmEnv(S2SEnv):
         if data not in self.all_objects:
             raise ValueError
         return self.all_objects[data]
-
 
     @property
     def available_mask(self) -> np.ndarray:
@@ -128,7 +131,7 @@ class AosmEnv(S2SEnv):
 
         objects = [object_ids[0]]
         for i in range(1, len(object_ids)):
-            if object_ids[i] != object_ids[i-1]:
+            if object_ids[i] != object_ids[i - 1]:
                 objects.append(object_ids[i])
 
         new_state = [[]] * len(state)
@@ -139,7 +142,15 @@ class AosmEnv(S2SEnv):
     def extend(self, state):
         inject = [0] * 104
         inject[-1] = -1
-        state = state[0:4] + inject + state[4:]
+        x, y, z, o = tuple(state[0:4])
+
+        # state = [x, y, z, o] + inject + state[4:]
+        # state = [x, y, z, 0] + inject + state[4:]
+
+        # also normalise
+        state = [x / 3, y / 3, z / 3, o / 360] + inject + state[4:]
+        # state = [x / 3, y / 3, z / 3, 0] + inject + state[4:]
+
         return state
 
     def load(self, file, max_transitions=np.inf):
@@ -171,6 +182,11 @@ class AosmEnv(S2SEnv):
                 next_state = next_state[next_state[:, -1].argsort()]
 
                 mask = self.compute_mask(state, next_state)
+                if len(mask) == 0:
+                    # self transition e.g walked to machine but already at machine.
+                    # TODO add as negative example??
+                    self.init_data.loc[len(self.init_data)] = [state, action, False]
+                    continue
                 object_type = tuple(state[mask][:, -1].astype(int))  # we have the object type, so let's use it!
                 self.transition_data.loc[len(self.transition_data)] = [episode, state, action, object_type,
                                                                        next_state,
@@ -275,9 +291,8 @@ class AosmEnv(S2SEnv):
     #             grouped_state = np.array(grouped_state)
     #             self.init_data.loc[len(self.init_data)] = [grouped_state, option, bool(can_execute)]
 
-
     def get_init_data(self):
-            return self.init_data
+        return self.init_data
 
     def get_transition_data(self):
         return self.transition_data

@@ -8,12 +8,15 @@ TYPES = {
     44: 'Mug',
     33: 'CoffeeMachine',
     14: 'Shelf',
+    -1: 'Robot'
 }
+
 
 def describe_object(obj, type):
     if type in TYPES:
         return '{}-{}'.format(TYPES[type], obj)
     return 'object-{}'.format(obj)
+
 
 def describe_data(state):
     key_atts = {
@@ -21,8 +24,11 @@ def describe_data(state):
         14: ["Receptacle_Mug"],
         33: ["Receptacle_Mug", "isToggled"],
         44: ["isFilledWithLiquid", "isPickedUp", "ParentReceptacle_CounterTop", "ParentReceptacle_CoffeeMachine",
-             "ParentReceptacle_Shelf"]
+             "ParentReceptacle_Shelf"],
+        -1: ['x', 'y', 'z', 'orientation']
     }
+
+
 
     meanings = ['isToggled', 'isBroken', 'isFilledWithLiquid', 'isDirty', 'isUsedUp', 'isCooked', 'isSliced', 'isOpen',
                 'isPickedUp', 'Receptacle_StoveBurner', 'Receptacle_Drawer', 'Receptacle_CounterTop',
@@ -65,6 +71,7 @@ def describe_data(state):
                 'ParentReceptacle_Mug',
                 'ParentReceptacle_ShelvingUnit', 'ParentReceptacle_Statue', 'ParentReceptacle_Stool',
                 'ParentReceptacle_Faucet', 'objectType']
+    robot_meanings = ['x', 'y', 'z', 'orientation'] + meanings[4:]
 
     desc = []
     start_idx = 0
@@ -75,10 +82,13 @@ def describe_data(state):
                 desc.insert(start_idx, '{}:{}'.format(meanings[i], TYPES.get(type, 'unknown {}'.format(type))))
                 start_idx = len(desc) + 1
             elif x != -1:
-                type = int(round(object[-1]))
+                type = int(int(round(object[-1])))
                 if type not in TYPES:
                     continue
-                if meanings[i] in key_atts[type]:
+                if type == -1:
+                    if robot_meanings[i] in key_atts[type]:
+                        desc.append('{}:{}'.format(robot_meanings[i], x))
+                elif meanings[i] in key_atts[type]:
                     desc.append('{}:{}'.format(meanings[i], int(round(x))))
         desc.append('---------------------------------')
     return '\n'.join(desc)
